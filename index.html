@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pokédex</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f0f0f0;
+      font-family: sans-serif;
+    }
+    svg {
+      display: block;
+      margin: 30px auto;
+      background-color: #e74c3c;
+      border-radius: 20px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    }
+    #pokemon-name {
+      fill: #ecf0f1;
+      font-size: 20px;
+      font-weight: bold;
+      text-anchor: middle;
+      text-transform: uppercase;
+    }
+    #pokemon-sprite {
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+  <svg id="pokedex" width="620" height="420"></svg>
+  <script>
+    const svg = d3.select("#pokedex");
+    let currentPokemonId = 1;
+    const totalPokemon = 999;
+    let direction = "right"; // Tracks scroll direction for animation
+
+    // --- Create reusable gradient for panel background ---
+    const defs = svg.append("defs");
+    const gradient = defs.append("linearGradient")
+      .attr("id", "panelGradient")
+      .attr("x1", "0%")
+      .attr("y1", "0%")
+      .attr("x2", "100%")
+      .attr("y2", "100%");
+    gradient.append("stop").attr("offset", "0%").attr("stop-color", "#c0392b");
+    gradient.append("stop").attr("offset", "100%").attr("stop-color", "#a5281a");
+
+    // --- Middle hinge ---
+    svg.append("rect")
+      .attr("x", 300).attr("y", 0).attr("width", 20).attr("height", 420)
+      .attr("fill", "#8e1e16").attr("rx", 5);
+
+    // --- Left panel layout ---
+    const left = svg.append("g").attr("id", "left-panel");
+    left.append("rect")
+      .attr("x", 10).attr("y", 10).attr("width", 300).attr("height", 400)
+      .attr("fill", "url(#panelGradient)").attr("rx", 15)
+      .attr("stroke", "#8e1e16").attr("stroke-width", 3);
+
+    // --- Camera lens ---
+    left.append("circle")
+      .attr("cx", 50).attr("cy", 40).attr("r", 20)
+      .attr("fill", "#3498db").attr("stroke", "#ecf0f1").attr("stroke-width", 3);
+
+    // --- LED indicators ---
+    left.selectAll("circle.led")
+      .data([0, 1, 2])
+      .enter()
+      .append("circle")
+      .attr("class", "led")
+      .attr("cx", (d, i) => 100 + i * 20)
+      .attr("cy", 40)
+      .attr("r", 5)
+      .attr("stroke", "#ecf0f1")
+      .attr("fill", (d, i) => ["#e74c3c", "#2ecc71", "#f1c40f"][i]);
+
+    // --- Main screen group ---
+    const screen = left.append("g").attr("id", "main-screen");
+    const displayMask = defs.append("clipPath").attr("id", "sprite-mask")
+      .append("rect")
+      .attr("x", 50).attr("y", 70).attr("width", 220).attr("height", 180);
+
+    screen.append("rect")
+      .attr("x", 50).attr("y", 70).attr("width", 220).attr("height", 180)
+      .attr("fill", "#222").attr("rx", 10)
+      .attr("stroke", "#ecf0f1").attr("stroke-width", 2);
+
+    // --- Pokémon name text ---
+    const pokemonName = screen.append("text")
+      .attr("id", "pokemon-name")
+      .attr("x", 160).attr("y", 95);
+
+    // --- Pokémon image placeholder ---
+    const pokemonSprite = screen.append("image")
+      .attr("id", "pokemon-sprite")
+      .attr("clip-path", "url(#sprite-mask)")
+      .attr("x", 120)
+      .attr("y", 110)
+      .attr("width", 100)
+      .attr("height", 100);
+
+    // --- D-Pad controls (for navigation) ---
+    const dpad = left.append("g").attr("id", "dpad").attr("transform", "translate(230, 310)");
+    const armLength = 20;
+    const armThickness = 14;
+    const centerSize = 16;
+
+    dpad.append("rect").attr("x", -armThickness / 2).attr("y", -armLength - centerSize / 2).attr("width", armThickness).attr("height", armLength).attr("fill", "#2c3e50").on("click", () => console.log("Up pressed"));
+    dpad.append("rect").attr("x", -armThickness / 2).attr("y", centerSize / 2).attr("width", armThickness).attr("height", armLength).attr("fill", "#2c3e50").on("click", () => console.log("Down pressed"));
+    dpad.append("rect").attr("x", -armLength - centerSize / 2).attr("y", -armThickness / 2).attr("width", armLength).attr("height", armThickness).attr("fill", "#2c3e50").on("click", () => { direction = "left"; scrollLeft(); });
+    dpad.append("rect").attr("x", centerSize / 2).attr("y", -armThickness / 2).attr("width", armLength).attr("height", armThickness).attr("fill", "#2c3e50").on("click", () => { direction = "right"; scrollRight(); });
+    dpad.append("rect").attr("x", -centerSize / 2).attr("y", -centerSize / 2).attr("width", centerSize).attr("height", centerSize).attr("fill", "#34495e");
+
+    // --- Right panel layout ---
+    const right = svg.append("g").attr("id", "right-panel");
+    right.append("rect")
+      .attr("x", 310).attr("y", 10).attr("width", 300).attr("height", 400)
+      .attr("fill", "url(#panelGradient)").attr("rx", 15)
+      .attr("stroke", "#8e1e16").attr("stroke-width", 3);
+
+    // --- Upper and lower stat screens ---
+    right.append("rect").attr("x", 340).attr("y", 40).attr("width", 240).attr("height", 100).attr("fill", "#222").attr("rx", 10).attr("stroke", "#ecf0f1").attr("stroke-width", 2);
+    right.append("rect").attr("x", 340).attr("y", 160).attr("width", 240).attr("height", 50).attr("fill", "#222").attr("rx", 5).attr("stroke", "#ecf0f1").attr("stroke-width", 2);
+
+    // --- Blue buttons grid ---
+    const btnGrid = right.append("g").attr("transform", "translate(340, 230)");
+    btnGrid.selectAll("rect.blue-btn")
+      .data(d3.range(6))
+      .enter()
+      .append("rect")
+      .attr("class", "blue-btn")
+      .attr("x", (d, i) => (i % 3) * 60)
+      .attr("y", (d, i) => Math.floor(i / 3) * 40)
+      .attr("width", 50)
+      .attr("height", 30)
+      .attr("fill", "#3498db")
+      .attr("rx", 5)
+      .attr("stroke", "#2980b9")
+      .attr("stroke-width", 2);
+
+    // --- Fetch Pokémon data and update screen ---
+    function updatePokemon(id) {
+      fetch(`https://pokeapi.co/api/v2/pokemon/${id}/`)
+        .then(response => response.json())
+        .then(data => {
+          pokemonName.text(data.name.toUpperCase());
+
+          // Entry & exit animation from left or right, confined to screen
+          const startX = direction === "right" ? 300 : -100;
+          pokemonSprite
+            .attr("x", startX)
+            .attr("y", 110)
+            .attr("opacity", 0)
+            .attr("href", data.sprites.front_default || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`)
+            .transition()
+            .duration(400)
+            .attr("x", 110)
+            .attr("opacity", 1);
+        })
+        .catch(error => console.error("Error fetching Pokémon:", error));
+    }
+
+    // --- Display first Pokémon ---
+    updatePokemon(currentPokemonId);
+
+    // --- Navigation controls ---
+    function scrollRight() {
+      currentPokemonId = (currentPokemonId % totalPokemon) + 1;
+      updatePokemon(currentPokemonId);
+    }
+
+    function scrollLeft() {
+      currentPokemonId = (currentPokemonId - 2 + totalPokemon) % totalPokemon + 1;
+      updatePokemon(currentPokemonId);
+    }
+  </script>
+</body>
+</html>
