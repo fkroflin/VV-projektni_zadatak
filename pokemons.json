@@ -23330,7 +23330,7 @@
         "Speed Min": "141",
         "Speed Max": "276"
     },
-    "Nidoran\u2640 (female) Nidoran\u2640": {
+    "Nidoran-f": {
         "Type": "Poison",
         "Species": "Poison Pin Pok\u00e9mon",
         "Height": "0.4 m (1\u203204\u2033)",
@@ -23363,7 +23363,7 @@
         "Speed Min": "78",
         "Speed Max": "199"
     },
-    "Nidoran\u2642 (male) Nidoran\u2642": {
+    "Nidoran-m": {
         "Type": "Poison",
         "Species": "Poison Pin Pok\u00e9mon",
         "Height": "0.5 m (1\u203208\u2033)",
