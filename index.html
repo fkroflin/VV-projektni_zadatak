@@ -28,6 +28,25 @@
     #pokemon-sprite {
       image-rendering: pixelated;
     }
+    .dpad-button {
+      cursor: pointer;
+      transition: fill 0.2s;
+    }
+    .dpad-button:hover {
+      fill: #1a252f;
+    }
+    .dpad-button:active {
+      fill: #0f151a;
+    }
+    .stat-label {
+      fill: #ecf0f1;
+      font-size: 12px;
+    }
+    .level-indicator {
+      fill: #ecf0f1;
+      font-size: 14px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -37,15 +56,17 @@
     let currentPokemonId = 1;
     let totalPokemon = 0;
     let direction = "right";
-    
-
     let pokemonStats = {};
+    let showingMega = false;
+    let megaForms = [];
+    let megaIndex = 0;
+    let currentLevel = 1;
+
     d3.json("pokemons.json").then(data => {
       pokemonStats = data;
-      totalPokemon = Object.keys(pokemonStats).length;
+      totalPokemon = Object.keys(pokemonStats).filter(name => !name.startsWith("Mega")).length;
       updatePokemon(currentPokemonId);
     });
-
 
     const defs = svg.append("defs");
     const gradient = defs.append("linearGradient")
@@ -58,7 +79,6 @@
       .attr("fill", "#8e1e16").attr("rx", 5);
 
     const left = svg.append("g").attr("id", "left-panel");
-
     left.append("rect")
       .attr("x", 10).attr("y", 10).attr("width", 300).attr("height", 400)
       .attr("fill", "url(#panelGradient)").attr("rx", 15).attr("stroke", "#8e1e16").attr("stroke-width", 3);
@@ -94,38 +114,88 @@
     const pokemonSprite = screen.append("image")
       .attr("id", "pokemon-sprite")
       .attr("clip-path", "url(#sprite-mask)")
-      .attr("x", 110)
-      .attr("y", 105)
-      .attr("width", 120)
-      .attr("height", 120);
+      .attr("x", 110).attr("y", 105)
+      .attr("width", 120).attr("height", 120);
 
-    // Group for multiple type icons
-    const typeGroup = screen.append("g")
-      .attr("id", "type-group");
+    const typeGroup = screen.append("g").attr("id", "type-group");
+
+    const levelText = screen.append("text")
+      .attr("x", 220)
+      .attr("y", 235)
+      .attr("class", "level-indicator")
+      .text(`Lv.${currentLevel}`);
+
+    const megaButton = left.append("g").attr("id", "mega-button");
+
+    megaButton.append("rect")
+      .attr("x", 50).attr("y", 300).attr("width", 100).attr("height", 30)
+      .attr("rx", 8)
+      .attr("fill", "#2e7d32")
+      .attr("stroke", "#1b5e20")
+      .attr("stroke-width", 2);
+
+    megaButton.append("text")
+      .attr("x", 100).attr("y", 315)
+      .attr("text-anchor", "middle")
+      .attr("alignment-baseline", "middle")
+      .attr("fill", "#ecf0f1")
+      .attr("font-size", "14px")
+      .attr("font-weight", "bold")
+      .text("MEGA");
+
+    megaButton.style("cursor", "pointer")
+      .on("click", () => {
+        if (!megaForms.length) return;
+        showingMega = true;
+        megaIndex = (megaIndex + 1) % (megaForms.length + 1);
+        if (megaIndex === 0) showingMega = false;
+        updatePokemon(currentPokemonId);
+      });
 
     const dpad = left.append("g").attr("transform", "translate(230, 310)");
     const armLength = 20, armThickness = 14, centerSize = 16;
 
-    dpad.append("rect").attr("x", -armThickness / 2).attr("y", -armLength - centerSize / 2)
-      .attr("width", armThickness).attr("height", armLength).attr("fill", "#2c3e50");
-    dpad.append("rect").attr("x", -armThickness / 2).attr("y", centerSize / 2)
-      .attr("width", armThickness).attr("height", armLength).attr("fill", "#2c3e50");
-    dpad.append("rect").attr("x", -armLength - centerSize / 2).attr("y", -armThickness / 2)
-      .attr("width", armLength).attr("height", armThickness).attr("fill", "#2c3e50").on("click", () => { direction = "left"; scrollLeft(); });
-    dpad.append("rect").attr("x", centerSize / 2).attr("y", -armThickness / 2)
-      .attr("width", armLength).attr("height", armThickness).attr("fill", "#2c3e50").on("click", () => { direction = "right"; scrollRight(); });
-    dpad.append("rect").attr("x", -centerSize / 2).attr("y", -centerSize / 2)
-      .attr("width", centerSize).attr("height", centerSize).attr("fill", "#34495e");
+    dpad.append("rect")
+      .attr("x", -armThickness / 2).attr("y", -armLength - centerSize / 2)
+      .attr("width", armThickness).attr("height", armLength)
+      .attr("fill", "#2c3e50").attr("class", "dpad-button")
+      .on("click", () => adjustLevel(10));
+
+    dpad.append("rect")
+      .attr("x", -armThickness / 2).attr("y", centerSize / 2)
+      .attr("width", armThickness).attr("height", armLength)
+      .attr("fill", "#2c3e50").attr("class", "dpad-button")
+      .on("click", () => adjustLevel(-10));
+
+    dpad.append("rect")
+      .attr("x", -armLength - centerSize / 2).attr("y", -armThickness / 2)
+      .attr("width", armLength).attr("height", armThickness)
+      .attr("fill", "#2c3e50").attr("class", "dpad-button")
+      .on("click", () => { direction = "left"; scrollLeft(); });
+
+    dpad.append("rect")
+      .attr("x", centerSize / 2).attr("y", -armThickness / 2)
+      .attr("width", armLength).attr("height", armThickness)
+      .attr("fill", "#2c3e50").attr("class", "dpad-button")
+      .on("click", () => { direction = "right"; scrollRight(); });
+
+    dpad.append("rect")
+      .attr("x", -centerSize / 2).attr("y", -centerSize / 2)
+      .attr("width", centerSize).attr("height", centerSize)
+      .attr("fill", "#34495e");
 
     const right = svg.append("g").attr("id", "right-panel");
-
-    right.append("rect").attr("x", 310).attr("y", 10).attr("width", 300).attr("height", 400)
+    right.append("rect")
+      .attr("x", 310).attr("y", 10).attr("width", 300).attr("height", 400)
       .attr("fill", "url(#panelGradient)").attr("rx", 15).attr("stroke", "#8e1e16").attr("stroke-width", 3);
 
-    right.append("rect").attr("x", 340).attr("y", 40).attr("width", 240).attr("height", 100)
+    right.append("rect")
+      .attr("x", 340).attr("y", 40).attr("width", 240).attr("height", 100)
       .attr("fill", "#222").attr("rx", 10).attr("stroke", "#ecf0f1").attr("stroke-width", 2);
 
-    right.append("rect").attr("x", 340).attr("y", 160).attr("width", 240).attr("height", 50)
+    const statScreen = right.append("g").attr("id", "stat-screen");
+    statScreen.append("rect")
+      .attr("x", 340).attr("y", 160).attr("width", 240).attr("height", 50)
       .attr("fill", "#222").attr("rx", 5).attr("stroke", "#ecf0f1").attr("stroke-width", 2);
 
     const btnGrid = right.append("g").attr("transform", "translate(340, 230)");
@@ -138,35 +208,72 @@
       .attr("width", 50).attr("height", 30)
       .attr("fill", "#3498db").attr("rx", 5).attr("stroke", "#2980b9").attr("stroke-width", 2);
 
+    function parseEVYield(evYield) {
+      const [value, stat] = evYield.split(" ");
+      return { stat: stat, value: parseInt(value) };
+    }
+
+    function calculateStat(base, level, statName, evYield) {
+      let EV = 0; // Default EV value
+      const evData = evYield ? parseEVYield(evYield) : null;
+      
+      // Map the stat names to match EV Yield stat names
+      const statMap = {
+        "HP": "HP",
+        "Attack": "Attack",
+        "Defense": "Defense",
+        "Special Attack": "Special Attack",
+        "Special Defense": "Special Defense",
+        "Speed": "Speed"
+      };
+
+      // Check if the current stat matches the EV Yield stat
+      if (evData && statMap[statName] === evData.stat) {
+        EV = evData.value;
+      }
+
+      return Math.floor((base * 2 + Math.floor(EV / 4)) * level / 100) + level + 10;
+    }
+
+    function adjustLevel(change) {
+      currentLevel = Math.min(100, Math.max(1, currentLevel + change));
+      levelText.text(`Lv.${currentLevel}`);
+      updatePokemon(currentPokemonId);
+    }
+
     function updatePokemon(id) {
       fetch(`https://pokeapi.co/api/v2/pokemon/${id}/`)
         .then(res => res.json())
         .then(data => {
-          const name = data.name;
-          const localName = name.charAt(0).toUpperCase() + name.slice(1);
+          const baseName = data.name.charAt(0).toUpperCase() + data.name.slice(1);
+          const allForms = Object.keys(pokemonStats).filter(k => k.startsWith(`Mega ${baseName}`));
+          megaForms = allForms;
 
-          // Only show if it's in the pokemons.json dataset
-          const localData = pokemonStats[localName];
+          let displayName = showingMega && megaForms.length ? megaForms[megaIndex - 1] : baseName;
+          const localData = pokemonStats[displayName];
           if (!localData || !localData.Type) {
             scrollRight();
             return;
           }
 
-          const displayName = name.toUpperCase();
-          pokemonName.text(displayName);
+          pokemonName.text(displayName.toUpperCase());
+          megaButton.select("rect")
+            .transition().duration(300)
+            .attr("fill", megaForms.length > 0 ? "#4caf50" : "#2e7d32");
 
-          // Update sprite with no transition
-          pokemonSprite
-            .attr("href", data.sprites.front_default)
-            .attr("opacity", 1)
-            .attr("x", 110);
+          pokemonSprite.transition().duration(300)
+            .attr("opacity", 0)
+            .on("end", () => {
+              pokemonSprite
+                .attr("href", data.sprites.front_default)
+                .attr("x", direction === "right" ? 130 : 90)
+                .transition().duration(300)
+                .attr("x", 110)
+                .attr("opacity", 1);
+            });
 
-          // Update types
           const types = localData.Type.split(',').map(t => t.toLowerCase().trim());
-          const iconSize = 24;
-          const padding = 6;
-          const baseX = 61;
-          const baseY = 215;
+          const iconSize = 24, padding = 6, baseX = 61, baseY = 215;
 
           d3.select("#type-group").selectAll("image").remove();
           d3.select("#type-group")
@@ -179,6 +286,28 @@
             .attr("y", baseY)
             .attr("width", iconSize)
             .attr("height", iconSize);
+
+          const stats = [
+            `HP: ${calculateStat(localData["HP Base"], currentLevel, "HP", localData["EV Yield"])}`,
+            `ATK: ${calculateStat(localData["Attack Base"], currentLevel, "Attack", localData["EV Yield"])}`,
+            `DEF: ${calculateStat(localData["Defense Base"], currentLevel, "Defense", localData["EV Yield"])}`,
+            `SPA: ${calculateStat(localData["Special Attack Base"], currentLevel, "Special Attack", localData["EV Yield"])}`,
+            `SPD: ${calculateStat(localData["Special Defense Base"], currentLevel, "Special Defense", localData["EV Yield"])}`,
+            `SPE: ${calculateStat(localData["Speed Base"], currentLevel, "Speed", localData["EV Yield"])}`
+          ];
+
+          d3.select("#stat-screen").selectAll("text").remove();
+          d3.select("#stat-screen")
+            .selectAll("text")
+            .data(stats)
+            .enter()
+            .append("text")
+            .attr("x", (d, i) => 350 + (i % 3) * 80)
+            .attr("y", (d, i) => 180 + Math.floor(i / 3) * 20)
+            .attr("class", "stat-label")
+            .text(d => d);
+
+          levelText.text(`Lv.${currentLevel}`);
         })
         .catch(() => {
           scrollRight();
@@ -186,12 +315,18 @@
     }
 
     function scrollRight() {
-      currentPokemonId = (currentPokemonId % totalPokemon) + 1;
+      currentPokemonId = currentPokemonId % totalPokemon + 1;
+      showingMega = false;
+      megaIndex = 0;
+      currentLevel = 1;
       updatePokemon(currentPokemonId);
     }
 
     function scrollLeft() {
       currentPokemonId = (currentPokemonId - 2 + totalPokemon) % totalPokemon + 1;
+      showingMega = false;
+      megaIndex = 0;
+      currentLevel = 1;
       updatePokemon(currentPokemonId);
     }
   </script>
