@@ -47,6 +47,16 @@
       font-size: 14px;
       font-weight: bold;
     }
+    .radar-chart {
+      fill: none;
+      stroke: #ecf0f1;
+      stroke-width: 1;
+    }
+    .radar-area {
+      fill: rgba(236, 240, 241, 0.3);
+      stroke: #ecf0f1;
+      stroke-width: 2;
+    }
   </style>
 </head>
 <body>
@@ -62,7 +72,7 @@
     let megaIndex = 0;
     let currentLevel = 1;
 
-    d3.json("pokemons.json").then(data => {
+    d3.json("filtered_pokemons.json").then(data => {
       pokemonStats = data;
       totalPokemon = Object.keys(pokemonStats).filter(name => !name.startsWith("Mega")).length;
       updatePokemon(currentPokemonId);
@@ -193,6 +203,48 @@
       .attr("x", 340).attr("y", 40).attr("width", 240).attr("height", 100)
       .attr("fill", "#222").attr("rx", 10).attr("stroke", "#ecf0f1").attr("stroke-width", 2);
 
+    // Radar chart area on the right side
+    const radarChart = right.append("g")
+      .attr("transform", "translate(460, 90) scale(0.6)"); // Centered in the screen at (340, 40) with width 240, height 100
+
+    const radarWidth = 200;
+    const radarHeight = 200;
+    const radius = Math.min(radarWidth, radarHeight) / 2;
+    const angleSlice = (Math.PI * 2) / 6; // 6 stats
+
+    // Draw radar chart axes and labels
+    const axes = radarChart.selectAll(".axis")
+      .data(["HP", "Attack", "Defense", "Special Attack", "Special Defense", "Speed"])
+      .enter()
+      .append("g")
+      .attr("class", "axis");
+
+    axes.append("line")
+      .attr("x1", 0)
+      .attr("y1", 0)
+      .attr("x2", (d, i) => radius * Math.cos(angleSlice * i - Math.PI / 2))
+      .attr("y2", (d, i) => radius * Math.sin(angleSlice * i - Math.PI / 2))
+      .attr("class", "radar-chart");
+
+    axes.append("text")
+      .attr("x", (d, i) => (radius + 10) * Math.cos(angleSlice * i - Math.PI / 2))
+      .attr("y", (d, i) => (radius + 10) * Math.sin(angleSlice * i - Math.PI / 2))
+      .attr("text-anchor", "middle")
+      .attr("fill", "#ecf0f1")
+      .attr("font-size", "10px")
+      .text(d => d);
+
+    // Draw radar grid
+    const levels = 5;
+    for (let i = 0; i < levels; i++) {
+      const levelFactor = radius * (i + 1) / levels;
+      radarChart.append("circle")
+        .attr("cx", 0)
+        .attr("cy", 0)
+        .attr("r", levelFactor)
+        .attr("class", "radar-chart");
+    }
+
     const statScreen = right.append("g").attr("id", "stat-screen");
     statScreen.append("rect")
       .attr("x", 340).attr("y", 160).attr("width", 240).attr("height", 50)
@@ -217,7 +269,6 @@
       let EV = 0; // Default EV value
       const evData = evYield ? parseEVYield(evYield) : null;
       
-      // Map the stat names to match EV Yield stat names
       const statMap = {
         "HP": "HP",
         "Attack": "Attack",
@@ -227,7 +278,6 @@
         "Speed": "Speed"
       };
 
-      // Check if the current stat matches the EV Yield stat
       if (evData && statMap[statName] === evData.stat) {
         EV = evData.value;
       }
@@ -288,18 +338,40 @@
             .attr("height", iconSize);
 
           const stats = [
-            `HP: ${calculateStat(localData["HP Base"], currentLevel, "HP", localData["EV Yield"])}`,
-            `ATK: ${calculateStat(localData["Attack Base"], currentLevel, "Attack", localData["EV Yield"])}`,
-            `DEF: ${calculateStat(localData["Defense Base"], currentLevel, "Defense", localData["EV Yield"])}`,
-            `SPA: ${calculateStat(localData["Special Attack Base"], currentLevel, "Special Attack", localData["EV Yield"])}`,
-            `SPD: ${calculateStat(localData["Special Defense Base"], currentLevel, "Special Defense", localData["EV Yield"])}`,
-            `SPE: ${calculateStat(localData["Speed Base"], currentLevel, "Speed", localData["EV Yield"])}`
+            calculateStat(localData["HP Base"], currentLevel, "HP", localData["EV Yield"]),
+            calculateStat(localData["Attack Base"], currentLevel, "Attack", localData["EV Yield"]),
+            calculateStat(localData["Defense Base"], currentLevel, "Defense", localData["EV Yield"]),
+            calculateStat(localData["Special Attack Base"], currentLevel, "Special Attack", localData["EV Yield"]),
+            calculateStat(localData["Special Defense Base"], currentLevel, "Special Defense", localData["EV Yield"]),
+            calculateStat(localData["Speed Base"], currentLevel, "Speed", localData["EV Yield"])
+          ];
+
+          // Update radar chart
+          const maxStat = 200; // Adjust this value based on your max stat range
+          const radarData = stats.map(stat => (stat / maxStat) * radius);
+
+          radarChart.selectAll(".radar-area").remove();
+          const radarPolygon = radarChart.append("polygon")
+            .attr("class", "radar-area")
+            .attr("points", radarData.map((value, i) => {
+              const x = value * Math.cos(angleSlice * i - Math.PI / 2);
+              const y = value * Math.sin(angleSlice * i - Math.PI / 2);
+              return `${x},${y}`;
+            }).join(" "));
+
+          const statsDisplay = [
+            `HP: ${stats[0]}`,
+            `ATK: ${stats[1]}`,
+            `DEF: ${stats[2]}`,
+            `SPA: ${stats[3]}`,
+            `SPD: ${stats[4]}`,
+            `SPE: ${stats[5]}`
           ];
 
           d3.select("#stat-screen").selectAll("text").remove();
           d3.select("#stat-screen")
             .selectAll("text")
-            .data(stats)
+            .data(statsDisplay)
             .enter()
             .append("text")
             .attr("x", (d, i) => 350 + (i % 3) * 80)
